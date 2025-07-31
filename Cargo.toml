@@ -1,0 +1,9 @@
+[package]
+name = "lcr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.98"
+flate2 = "1.1.2"
+statrs = "0.18.0"
