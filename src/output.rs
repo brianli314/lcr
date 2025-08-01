@@ -18,7 +18,7 @@ pub fn write_lcr(palins: &mut Vec<LCR>, file_name: &str) -> Result<()> {
 
     let _ = writeln!(
         writer,
-        "Name\tStart\tEnd\n"
+        "Name\tStart\tEnd\tString\n"
     );
     for palin in palins {
         let _ = writeln!(writer, "{}", palin);

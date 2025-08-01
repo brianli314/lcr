@@ -1,95 +1,117 @@
 use core::fmt;
-use std::{clone, cmp::max, collections::HashMap, hash::Hash};
+use std::{cmp::max, collections::HashMap};
 
-use statrs::function::gamma::ln_gamma;
+use statrs::function::{factorial::ln_factorial};
 
-use crate::fasta_parsing::{Fasta};
+use crate::fasta_parsing::Fasta;
 
 #[derive(Clone)]
-pub struct LCR{
+pub struct LCR {
     pub name: String,
     pub start: usize,
-    pub end: usize
+    pub end: usize,
+    pub seq: String,
 }
 
-impl LCR{
-    pub fn new(name: String, start: usize, end:usize) -> Self{
-        Self { name, start, end}
+impl LCR {
+    pub fn new(name: String, start: usize, end: usize, seq: String) -> Self {
+        Self { name, start, end, seq}
     }
 
-    pub fn get_name(&self) -> &str{
+    pub fn get_name(&self) -> &str {
         &self.name
     }
-    pub fn get_start(&self) -> usize{
+    pub fn get_start(&self) -> usize {
         self.start
     }
-    pub fn get_end(&self) -> usize{
+    pub fn get_end(&self) -> usize {
         self.end
     }
 }
 
 impl fmt::Display for LCR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}\t{}\t{}",
-            self.name,
-            self.start,
-            self.end,
-        )
+        write!(f, "{}\t{}\t{}\t{}", self.name, self.start, self.end, self.seq)
     }
 }
 
-pub fn slowdust(input: Fasta, max_window: usize, threshold: f32, output: &mut Vec<LCR>){
+pub fn slowdust(input: Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
-    for i in 0..seq.len(){
-        for w in 2..max_window{
-            if w > i {break}
+    for i in 0..seq.len() {
+        for w in 2..max_window {
+            if w > i {
+                break;
+            }
 
-            let window = &seq[i-w..=i];
-            let window_score = sdust_score(window);
+            let window = &seq[i - w..=i];
+            let window_score = longdust_score(window, threshold);
 
-            if window_score < threshold{
+            if window_score < threshold {
                 continue;
             }
-            for j in 2..window.len(){
+            let mut is_good = true;
+            for j in 2..window.len() {
                 let prefix = &window[..j];
                 let suffix = &window[j..];
-                if sdust_score(prefix) > window_score || sdust_score(suffix) > window_score{
-                    continue;
-                } else {
-                    output.push(LCR { name: input.get_name().to_owned(), start: i-w, end: i })
+                if longdust_score(prefix, threshold) > window_score || longdust_score(suffix, threshold) > window_score {
+                    is_good = false;
+                    break;
                 }
+            }
+            if is_good {
+                output.push(LCR {
+                    name: input.get_name().to_owned(),
+                    start: i - w,
+                    end: i,
+                    seq: window.to_owned()
+                });
+                //println!("{}", window_score);
             }
         }
     }
 }
 
-fn sdust_score(x: &str) -> f32 {
+fn sdust_score(x: &str) -> f64 {
     let k = 2;
+
+    if x.len() < k {
+        return 0.0; // can't make any k-mers
+    }
+
     let l = x.len().saturating_sub(k) + 1;
-    if l == 0 {
-        return 0.0;
-    }
 
-    let mut counts = HashMap::new();
-    for i in 0..x.len().saturating_sub(k) {
-        let kmer = &x[i..i + k];
-        *counts.entry(kmer).or_insert(0) += 1;
-    }
-
+    let counts = count_kmers(x, k);
     let mut sum = 0.0;
     for &c in counts.values() {
         if c >= 2 {
-            sum += (c * (c - 1)) as f32 / 2.0;
+            sum += (c * (c - 1)) as f64 / 2.0;
         }
     }
 
-    sum / l as f32
+    sum / l as f64
 }
 
+fn longdust_score(x: &str, threshold: f64) -> f64 {
+    let k = 2;
+    if x.len() < k {
+        return 0.0;
+    }
+    let counts = count_kmers(x, k);
+    let output: f64 = counts.values().map(|&c| ln_factorial(c as u64)).sum();
+    
+    output - threshold * ((x.len().saturating_sub(k) + 1) as f64)
+}
 
-pub fn merge_intervals(intervals: Vec<LCR>) -> Vec<LCR> {
+fn count_kmers(x: &str, k: usize) -> HashMap<&str, i32>{
+    let mut counts = HashMap::new();
+    for i in 0..=x.len().saturating_sub(k) {
+        let kmer = &x[i..i + k];
+        *counts.entry(kmer).or_insert(0) += 1;
+    }
+    counts
+}
+
+pub fn merge_intervals(intervals: Vec<LCR>, full_sequence: &str) -> Vec<LCR> {
     if intervals.is_empty() {
         return Vec::new();
     }
@@ -101,23 +123,33 @@ pub fn merge_intervals(intervals: Vec<LCR>) -> Vec<LCR> {
         if lcr.get_name() != combined.get_name() {
             merged_all.push(combined.clone());
             combined = lcr;
-        } else if lcr.get_start() <= combined.get_end() && lcr.get_end() >= combined.get_start(){
+        } else if lcr.get_start() <= combined.get_end() && lcr.get_end() >= combined.get_start() {
+            let new_start = combined.get_start();
+            let new_end = max(combined.get_end(), lcr.get_end());
+
+            let merged_seq = full_sequence
+                .get(new_start..=new_end)
+                .unwrap_or("")
+                .to_string();
+
             combined = LCR::new(
                 lcr.get_name().to_owned(),
-                combined.get_start(),
-                max(lcr.get_end(), combined.get_end()),
+                new_start,
+                new_end,
+                merged_seq,
             );
         } else {
             merged_all.push(combined.clone());
             combined = lcr;
         }
     }
-    merged_all.push(combined);
 
+    merged_all.push(combined);
     merged_all
 }
 
-/* 
+
+/*
 pub fn slowdust2(input: Fasta, window_len: usize, threshold: f64, output: &mut Vec<LCR>){
     let seq = input.get_sequence();
     for w in 1..window_len{
@@ -201,9 +233,3 @@ fn score(s: &str, f_cache: Option<&mut HashMap<u64, f64>>) -> f64 {
     log_fact_sum
 }
 */
-
-
-
-
-
-

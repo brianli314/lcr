@@ -17,15 +17,17 @@ fn main() -> Result<()>{
     for line in iterator{
         let mut temp = Vec::new();
         let fasta = line?;
-        slowdust(fasta, 30, 2.0,  &mut temp);
+        let fasta_clone = fasta.clone();
+        let seq = fasta_clone.get_sequence();
+        slowdust(fasta, 30,1.5,  &mut temp);
         temp.sort_by(
             |lcr1, lcr2, | 
             lcr1.get_start().cmp(&lcr2.get_start())
             .then(lcr1.get_end().cmp(&lcr2.get_end())));
-        output.append(&mut temp);
+        output.append(&mut merge_intervals(temp, seq));
     }
 
-    //let mut new: Vec<LCR> = merge_intervals(output);
+    //let mut new: Vec<LCR> = merge_intervals(output, );
 
     let _ = write_lcr(&mut output, "output1.tsv");
     
