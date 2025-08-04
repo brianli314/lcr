@@ -92,7 +92,7 @@ fn sdust_score(x: &str) -> f64 {
 }
 
 fn longdust_score(x: &str, threshold: f64) -> f64 {
-    let k = 2;
+    let k = 7;
     if x.len() < k {
         return 0.0;
     }
