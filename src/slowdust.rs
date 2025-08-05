@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{cmp::max, collections::HashMap};
+use std::{cmp::max, collections::HashMap, time::Instant};
 
 use statrs::function::{factorial::ln_factorial};
 
@@ -38,17 +38,27 @@ impl fmt::Display for LCR {
 pub fn slowdust(input: Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
     for i in 0..seq.len() {
+        //let loop_now = Instant::now();
+        if i % 100 == 0 {
+            println!("Running on {}th base pair", i)
+        }
         for w in 2..max_window {
             if w > i {
                 break;
             }
 
             let window = &seq[i - w..=i];
+        
+            //let window_now = Instant::now();
             let window_score = longdust_score(window, threshold);
+            //let window_elapsed = window_now.elapsed();
+            //println!("Computed window score: {:.2?}", window_elapsed);
 
             if window_score < threshold {
                 continue;
             }
+
+            
             let mut is_good = true;
             for j in 2..window.len() {
                 let prefix = &window[..j];
@@ -67,7 +77,9 @@ pub fn slowdust(input: Fasta, max_window: usize, threshold: f64, output: &mut Ve
                 });
                 //println!("{}", window_score);
             }
+            
         }
+        //println!("1 base pair done in: {:.2?}", loop_now.elapsed())
     }
 }
 
