@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.98"
 flate2 = "1.1.2"
+rustc-hash = "2.1.1"
 statrs = "0.18.0"

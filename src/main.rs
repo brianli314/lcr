@@ -32,6 +32,7 @@ fn main() -> Result<()>{
         let fasta_clone = fasta.clone();
         let seq = fasta_clone.get_sequence();
         slowdust(fasta, 5000,0.6,  &mut temp);
+        
         temp.sort_by(
             |lcr1, lcr2, | 
             lcr1.get_start().cmp(&lcr2.get_start())
