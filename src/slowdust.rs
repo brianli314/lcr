@@ -35,7 +35,7 @@ impl fmt::Display for LCR {
     }
 }
 
-pub fn slowdust(input: Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
+pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
     let mut ln_cache = FxHashMap::default();
     for i in 0..seq.len() {
