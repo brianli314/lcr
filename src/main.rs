@@ -14,7 +14,7 @@ fn main() -> Result<()>{
     let num_threads = 3;
     let pool = ThreadPool::new(num_threads);
 
-    let file = File::open("small.fasta")?;
+    let file = File::open("test copy.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
 
@@ -56,7 +56,7 @@ fn main() -> Result<()>{
                 let _ = writeln!(guard, "{}", lcr);
             }
             guard.flush().expect("Failed to flush writer");
-            
+
             let name = fasta.get_name().split_whitespace().next().unwrap_or_default();
             let loop_elapsed = loop_now.elapsed();
             println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
