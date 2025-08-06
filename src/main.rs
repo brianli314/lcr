@@ -14,7 +14,7 @@ fn main() -> Result<()>{
     let num_threads = 3;
     let pool = ThreadPool::new(num_threads);
 
-    let file = File::open("test copy.fasta")?;
+    let file = File::open("small.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
 
@@ -38,9 +38,9 @@ fn main() -> Result<()>{
     for line in iterator {
         let fasta = line?;
         let writer_clone = Arc::clone(&writer);
+
         
         pool.execute(move || {
-            let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
             let loop_now = Instant::now();
             let mut temp = Vec::new();
             let fasta_clone = fasta.clone();
@@ -52,11 +52,12 @@ fn main() -> Result<()>{
                 .then(lcr1.get_end().cmp(&lcr2.get_end())));
 
             let merged = merge_intervals(temp, seq);
+
+            let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
             for lcr in merged {
                 let _ = writeln!(guard, "{}", lcr);
             }
             guard.flush().expect("Failed to flush writer");
-
             let name = fasta.get_name().split_whitespace().next().unwrap_or_default();
             let loop_elapsed = loop_now.elapsed();
             println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
