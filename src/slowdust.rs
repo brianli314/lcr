@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{cmp::max, collections::HashMap, time::Instant};
+use std::{cmp::max, time::Instant};
 use rustc_hash::FxHashMap;
 use statrs::function::{factorial::ln_factorial};
 
@@ -38,9 +38,10 @@ impl fmt::Display for LCR {
 pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
     let mut ln_cache = FxHashMap::default();
+    let name = input.get_name().split_whitespace().next().unwrap_or_default();
     for i in 0..seq.len() {
         if i % 1000 == 0{
-            println!("Running on {}th base pair", i)
+            println!("Running on {i}th base pair for {name}");
         }
         for w in 2..max_window {
             if w > i {
@@ -67,7 +68,7 @@ pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut V
             }
             if is_good {
                 output.push(LCR {
-                    name: input.get_name().to_owned(),
+                    name: name.to_owned(),
                     start: i - w,
                     end: i,
                     seq: window.to_owned()
