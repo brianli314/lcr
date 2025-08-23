@@ -40,9 +40,6 @@ pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut V
     let mut ln_cache = FxHashMap::default();
     let name = input.get_name().split_whitespace().next().unwrap_or_default();
     for i in 0..seq.len() {
-        if i % 1000 == 0{
-            println!("Running on {i}th base pair for {name}");
-        }
         for w in 2..max_window {
             if w > i {
                 break;
