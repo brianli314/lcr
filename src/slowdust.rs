@@ -1,6 +1,6 @@
 use core::fmt;
-use std::{cmp::max, collections::HashMap};
-
+use std::{cmp::max, time::Instant};
+use rustc_hash::FxHashMap;
 use statrs::function::{factorial::ln_factorial};
 
 use crate::fasta_parsing::Fasta;
@@ -35,60 +35,62 @@ impl fmt::Display for LCR {
     }
 }
 
-pub fn slowdust(input: Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
+pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
+    let mut ln_cache = FxHashMap::default();
+    let name = input.get_name().split_whitespace().next().unwrap_or_default();
     for i in 0..seq.len() {
+        if i % 1000 == 0{
+            println!("Running on {i}th base pair for {name}");
+        }
         for w in 2..max_window {
             if w > i {
                 break;
             }
 
             let window = &seq[i - w..=i];
-            let window_score = longdust_score(window, threshold);
-
+            
+            //let window_time = Instant::now();
+            let window_score = longdust_score_cached(window, threshold, &mut ln_cache);
+            //println!("Computed window in: {:.2?}", window_time.elapsed());
             if window_score < threshold {
                 continue;
             }
+
             let mut is_good = true;
             for j in 2..window.len() {
                 let prefix = &window[..j];
                 let suffix = &window[j..];
-                if longdust_score(prefix, threshold) > window_score || longdust_score(suffix, threshold) > window_score {
+                if longdust_score_cached(prefix, threshold, &mut ln_cache) > window_score || longdust_score_cached(suffix, threshold, &mut ln_cache) > window_score {
                     is_good = false;
                     break;
                 }
             }
             if is_good {
                 output.push(LCR {
-                    name: input.get_name().to_owned(),
+                    name: name.to_owned(),
                     start: i - w,
                     end: i,
                     seq: window.to_owned()
                 });
-                //println!("{}", window_score);
             }
+            
         }
     }
 }
 
-fn sdust_score(x: &str) -> f64 {
-    let k = 2;
 
+fn longdust_score_cached(x: &str, threshold: f64, cache: &mut FxHashMap<i32, f64>) -> f64 {
+    let k = 7;
     if x.len() < k {
-        return 0.0; // can't make any k-mers
+        return 0.0;
     }
-
-    let l = x.len().saturating_sub(k) + 1;
-
     let counts = count_kmers(x, k);
-    let mut sum = 0.0;
-    for &c in counts.values() {
-        if c >= 2 {
-            sum += (c * (c - 1)) as f64 / 2.0;
-        }
-    }
+    let output: f64 = counts.values().map(|&c| {
+        *cache.entry(c).or_insert_with(|| ln_factorial(c as u64))
+    }).sum();
 
-    sum / l as f64
+    output - threshold * ((x.len().saturating_sub(k) + 1) as f64)
 }
 
 pub fn longdust_score(x: &str, threshold: f64) -> f64 {
@@ -102,8 +104,8 @@ pub fn longdust_score(x: &str, threshold: f64) -> f64 {
     output - threshold * ((x.len().saturating_sub(k) + 1) as f64)
 }
 
-fn count_kmers(x: &str, k: usize) -> HashMap<&str, i32>{
-    let mut counts = HashMap::new();
+fn count_kmers(x: &str, k: usize) -> FxHashMap<&str, i32>{
+    let mut counts = FxHashMap::default();
     for i in 0..=x.len().saturating_sub(k) {
         let kmer = &x[i..i + k];
         *counts.entry(kmer).or_insert(0) += 1;
