@@ -79,25 +79,6 @@ pub fn slowdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut V
     }
 }
 
-fn sdust_score(x: &str) -> f64 {
-    let k = 2;
-
-    if x.len() < k {
-        return 0.0; 
-    }
-
-    let l = x.len().saturating_sub(k) + 1;
-
-    let counts = count_kmers(x, k);
-    let mut sum = 0.0;
-    for &c in counts.values() {
-        if c >= 2 {
-            sum += (c * (c - 1)) as f64 / 2.0;
-        }
-    }
-
-    sum / l as f64
-}
 
 fn longdust_score_cached(x: &str, threshold: f64, cache: &mut FxHashMap<i32, f64>) -> f64 {
     let k = 7;
@@ -112,7 +93,7 @@ fn longdust_score_cached(x: &str, threshold: f64, cache: &mut FxHashMap<i32, f64
     output - threshold * ((x.len().saturating_sub(k) + 1) as f64)
 }
 
-fn longdust_score(x: &str, threshold: f64) -> f64 {
+pub fn longdust_score(x: &str, threshold: f64) -> f64 {
     let k = 7;
     if x.len() < k {
         return 0.0;

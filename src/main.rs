@@ -7,14 +7,14 @@ use std::{fs::File, io::{BufReader, BufWriter, Write}, sync::{Arc, Mutex}, time:
 use anyhow::{Ok, Result};
 use threadpool::ThreadPool;
 
-use crate::{fasta_parsing::{FastaIterator, BUFF_SIZE}, slowdust::{merge_intervals, slowdust, LCR}};
+use crate::{fasta_parsing::{FastaIterator, BUFF_SIZE}, slowdust::{longdust_score, merge_intervals, slowdust, LCR}};
 
 fn main() -> Result<()>{
 
-    let num_threads = 3;
+    let num_threads = 1;
     let pool = ThreadPool::new(num_threads);
 
-    let file = File::open("small.fasta")?;
+    let file = File::open("select_region.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
 
@@ -60,6 +60,8 @@ fn main() -> Result<()>{
             guard.flush().expect("Failed to flush writer");
             let name = fasta.get_name().split_whitespace().next().unwrap_or_default();
             let loop_elapsed = loop_now.elapsed();
+
+            println!("{}", longdust_score(seq, 0.6));
             println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
         });
         //output.append(&mut merge_intervals(temp, seq));
