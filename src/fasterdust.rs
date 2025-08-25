@@ -1,5 +1,4 @@
 use core::fmt;
-use std::cmp::max;
 use rustc_hash::FxHashMap;
 
 use crate::fasta_parsing::Fasta;
@@ -27,101 +26,271 @@ impl fmt::Display for LCR {
     }
 }
 
-/// Same semantics as your original `slowdust`, but much faster:
-/// - still loops (i, w) over all end positions and window sizes
-/// - still uses `threshold` as both the per-k-mer penalty T and the min score filter
-/// - still treats k-mers as exact string slices (so 'N', lowercase, etc. are allowed)
-pub fn fasterdust(input: &Fasta, max_window: usize, threshold: f64, output: &mut Vec<LCR>) {
-    let seq_str = input.get_sequence();
-    let seq = seq_str.as_bytes();
-    if seq.is_empty() { return; }
+/// Encode A/C/G/T → 2-bit; anything else -> None
+#[inline]
+fn base2(b: u8) -> Option<u8> {
+    match b {
+        b'A' | b'a' => Some(0),
+        b'C' | b'c' => Some(1),
+        b'G' | b'g' => Some(2),
+        b'T' | b't' => Some(3),
+        _ => None,
+    }
+}
 
-    let name = input.get_name().split_whitespace().next().unwrap_or_default().to_owned();
+/// Precompute k-mer codes at each start position (length = seq.len()).
+/// Positions where a full k-mer doesn't exist or includes a non-ACGT get None.
+fn precompute_kmers(seq: &[u8], k: usize) -> Vec<Option<u64>> {
+    let mut codes = vec![None; seq.len()];
+    if k == 0 || seq.len() < k { return codes; }
 
-    // choose k to match your scoring
-    let k: usize = 7;
+    let mask: u64 = if 2*k == 64 { u64::MAX } else { (1u64 << (2*k)) - 1 };
+    let mut code: u64 = 0;
+    let mut valid = 0usize;
 
-    for i in 0..seq.len() {
-        if i % 1000 == 0 {
-            println!("Running on {i}th base pair for {name}");
-        }
-
-        // Per-endpoint state: we grow windows leftwards from end = i
-        let mut kmer_counts: FxHashMap<&[u8], u32> = FxHashMap::default();
-
-        // Running totals for the *current* window (which grows as w increases)
-        let mut s_total: f64 = 0.0;              // S(window)
-        let mut ell: usize = 0;                  // number of k-mers in window
-        let mut max_pref_proper: f64 = f64::NEG_INFINITY; // max score over proper prefixes
-        let mut max_suf_proper: f64 = f64::NEG_INFINITY;  // max score over proper suffixes
-
-        // grow window size w = 1..=max, but stop at left boundary
-        let max_w = max_window.min(i + 1);
-        for w in 1..=max_w {
-            let start = i + 1 - w;
-
-            // If adding this base creates a *new* k-mer at the left edge, update counts/score.
-            if w >= k {
-                let kmer_start = start;
-                let kmer_end = start + k; // exclusive
-                let kmer = &seq[kmer_start..kmer_end];
-
-                let entry = kmer_counts.entry(kmer).or_insert(0);
-                let c_prev = *entry as f64;
-                *entry += 1;
-                ell += 1;
-
-                // Incremental score update: Δ = ln(c_prev + 1) - threshold
-                let delta = (c_prev + 1.0).ln() - threshold;
-
-                // Before updating s_total, update max suffix based on the *previous* total.
-                // The entire previous window becomes a proper suffix of the new window.
-                if ell > 1 {
-                    // only meaningful when there was a previous window with >=1 k-mer
-                    if s_total > max_suf_proper {
-                        max_suf_proper = s_total;
-                    }
+    for (i, &b) in seq.iter().enumerate() {
+        match base2(b) {
+            Some(v) => {
+                code = ((code << 2) | (v as u64)) & mask;
+                valid += 1;
+                if valid >= k {
+                    let start = i + 1 - k;
+                    codes[start] = Some(code);
                 }
-
-                // Update running total
-                s_total += delta;
-
-                // Update max proper prefix: either just this delta, or delta + previous max prefix
-                if ell > 1 {
-                    let cand1 = delta;
-                    let cand2 = delta + max_pref_proper;
-                    max_pref_proper = if cand1 > cand2 { cand1 } else { cand2 };
-                } else {
-                    // First k-mer in the window => no proper prefix with any k-mers
-                    max_pref_proper = f64::NEG_INFINITY;
-                    max_suf_proper  = f64::NEG_INFINITY;
-                }
-
-                // Evaluate "good" only if it passes the min-score filter, like your code
-                if s_total >= threshold {
-                    // Good iff no proper prefix/suffix scores higher than the whole window
-                    let good_prefix = max_pref_proper <= s_total;
-                    let good_suffix = max_suf_proper  <= s_total;
-
-                    if good_prefix && good_suffix {
-                        // Push interval [start, i] inclusive, with exact sequence slice
-                        let subseq = unsafe {
-                            std::str::from_utf8_unchecked(&seq[start..=i])
-                        }.to_owned();
-
-                        output.push(LCR {
-                            name: name.clone(),
-                            start,
-                            end: i,
-                            seq: subseq,
-                        });
-                    }
-                }
-            } else {
-                // w < k: the score remains 0 (no k-mers yet). Your original code would
-                // compute 0 and then immediately filter it out if `threshold > 0`.
-                // We skip "good" evaluation here for speed; behavior is identical when threshold > 0.
+            }
+            None => {
+                code = 0;
+                valid = 0;
             }
         }
     }
+    codes
 }
+
+/// EXACT algorithm per your outline (1–6).
+/// k: k-mer length (set 7 to match your scoring)
+/// t: threshold T (used in S_L as the per-k-mer penalty, AND as the minimum score filter)
+pub fn fasterdust(
+    input: &Fasta,
+    k: usize,
+    max_window: usize,
+    t: f64,
+    output: &mut Vec<LCR>,
+) {
+    let seq_str = input.get_sequence();
+    let seq = seq_str.as_bytes();
+    if seq.len() < k { return; }
+
+    let name = input
+        .get_name()
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_owned();
+
+    // Precompute k-mer code at each start
+    let kmers = precompute_kmers(seq, k);
+
+    // Precompute ln(n) for increments Δ = ln(c_prev+1) - t
+    let max_kmers_per_window = max_window.saturating_sub(k).saturating_add(1);
+    let mut ln_table = vec![0.0f64; max_kmers_per_window + 2]; // index by (c_prev+1)
+    for n in 1..ln_table.len() {
+        ln_table[n] = (n as f64).ln();
+    }
+
+    for end in 0..seq.len() {
+        // We can only form windows with at least one k-mer if end+1 >= k
+        if end + 1 < k { continue; }
+
+        // Largest window allowed by max_window (in bases)
+        let min_start_base = end.saturating_add(1).saturating_sub(max_window);
+
+        // For this end, we expand windows leftward, adding exactly one new k-mer each step
+        let first_kmer_start = end + 1 - k; // start of the rightmost k-mer in the window
+
+        let mut win_counts: FxHashMap<u64, u32> = FxHashMap::default();
+        let mut s_total = 0.0f64;  // S_L(window)
+        let mut ell = 0usize;      // # of k-mers in window
+
+        // Start from the smallest window with >=1 k-mer, and grow leftward
+        // Each iteration adds the k-mer starting at `start`
+        let mut start = first_kmer_start as isize;
+        let stop = min_start_base as isize;
+
+        while start >= stop {
+            let s = start as usize;
+
+            // If the k-mer at `s` is invalid (contains non-ACGT), we stop expanding this end.
+            let code = match kmers.get(s).and_then(|&c| c) {
+                Some(code) => code,
+                None => break,
+            };
+
+            // Update window score incrementally: Δ = ln(c_prev+1) - t
+            let entry = win_counts.entry(code).or_insert(0);
+            let c_prev = *entry as usize;
+            *entry += 1;
+            ell += 1;
+            if c_prev + 1 < ln_table.len() {
+                s_total += ln_table[c_prev + 1] - t;
+            } else {
+                // Shouldn't happen with sane max_window; fallback:
+                s_total += ((c_prev + 1) as f64).ln() - t;
+            }
+
+            // Only evaluate "good" if the total score passes your minimum filter
+            if s_total >= t
+                && is_good_window(&kmers, s, end, k, t, &ln_table, s_total) {
+                    // Push [start, end] inclusive, with exact sequence slice
+                    let subseq = unsafe {
+                        std::str::from_utf8_unchecked(&seq[s..=end])
+                    }.to_owned();
+
+                    output.push(LCR {
+                        name: name.clone(),
+                        start: s,
+                        end,
+                        seq: subseq,
+                    });
+                }
+
+            start -= 1;
+        }
+    }
+}
+
+/// Check "good": no proper prefix or proper suffix has higher score than S(window).
+/// We recompute prefix/suffix scores **exactly** over the k-mers of this window.
+/// Early-out as soon as we detect a violation.
+fn is_good_window(
+    kmers: &[Option<u64>],
+    start_base: usize,
+    end_base: usize,
+    k: usize,
+    t: f64,
+    ln_table: &[f64],
+    s_total: f64,
+) -> bool {
+    // The k-mers contained in [start_base ..= end_base] start at:
+    //    start_k ..= last_k   where last_k = end_base + 1 - k
+    let last_k = end_base + 1 - k;
+    let start_k = start_base;
+    debug_assert!(last_k >= start_k);
+
+    // ---- Proper prefixes: start_k .. last_k-1 ----
+    // Accumulate from left to right, stop if any prefix score exceeds s_total
+    {
+        let mut counts: FxHashMap<u64, u32> = FxHashMap::default();
+        let mut s = 0.0f64;
+
+        for pos in start_k..last_k { // excludes the last k-mer => proper prefix
+            let code = match kmers[pos] {
+                Some(c) => c,
+                None => return false, // shouldn't happen if outer loop screened, but be safe
+            };
+            let entry = counts.entry(code).or_insert(0);
+            let c_prev = *entry as usize;
+            *entry += 1;
+            s += ln_table[c_prev + 1] - t;
+
+            if s > s_total {
+                return false; // a proper prefix beats the window
+            }
+        }
+    }
+
+    // ---- Proper suffixes: start_k+1 .. last_k (right to left) ----
+    {
+        let mut counts: FxHashMap<u64, u32> = FxHashMap::default();
+        let mut s = 0.0f64;
+
+        // build from the rightmost k-mer backwards, but only up to a proper suffix
+        // i.e., include positions last_k, last_k-1, ..., start_k+1
+        for pos in (start_k + 1..=last_k).rev() {
+            let code = match kmers[pos] {
+                Some(c) => c,
+                None => return false,
+            };
+            let entry = counts.entry(code).or_insert(0);
+            let c_prev = *entry as usize;
+            *entry += 1;
+            s += ln_table[c_prev + 1] - t;
+
+            if s > s_total {
+                return false; // a proper suffix beats the window
+            }
+        }
+    }
+
+    true
+}
+
+/// Union (merge) overlapping/touching LCRs, per contig name.
+/// - Coordinates are treated as inclusive [start, end].
+/// - If `merge_touching` is true, [a..b] and [b+1..c] are merged.
+/// - Merged `seq` is built by appending only the non-overlapping tail from the
+///   next interval’s `seq`, so you don't need the full reference string.
+pub fn union_good_intervals(mut ivals: Vec<LCR>, merge_touching: bool) -> Vec<LCR> {
+    if ivals.is_empty() {
+        return ivals;
+    }
+
+    // Sort by (name, start, end)
+    ivals.sort_by(|a, b| {
+        match a.name.cmp(&b.name) {
+            std::cmp::Ordering::Equal => match a.start.cmp(&b.start) {
+                std::cmp::Ordering::Equal => a.end.cmp(&b.end),
+                o => o,
+            },
+            o => o,
+        }
+    });
+
+    let mut out = Vec::<LCR>::with_capacity(ivals.len());
+    let mut cur = ivals[0].clone();
+
+    for nxt in ivals.into_iter().skip(1) {
+        if nxt.name != cur.name {
+            // Different contig: flush current and start a new chain
+            out.push(cur);
+            cur = nxt;
+            continue;
+        }
+
+        // Decide if they should be merged
+        let joinable = if merge_touching {
+            nxt.start <= cur.end + 1
+        } else {
+            nxt.start <= cur.end
+        };
+
+        if joinable {
+            if nxt.end > cur.end {
+                // Append only the non-overlapping tail of nxt.seq to cur.seq
+                // Overlap length in bases (≥0 if there is overlap, 0 if just touching)
+                let overlap_len = cur.end.saturating_sub(nxt.start).saturating_add(1);
+                // How many new bases are added beyond `cur.end`
+                let ext_len = nxt.end - cur.end;
+
+                if ext_len > 0 {
+                    // Take the last `ext_len` chars from nxt.seq
+                    let tail = &nxt.seq[nxt.seq.len() - ext_len..];
+                    cur.seq.push_str(tail);
+                    cur.end = nxt.end;
+                }
+                // If nxt.end <= cur.end, cur already fully covers nxt; nothing to do.
+                // (Contained intervals are naturally absorbed.)
+                let _ = overlap_len; // kept for clarity
+            }
+            // If not extending, we effectively absorb nxt (it’s contained).
+        } else {
+            // Disjoint: flush current and start new chain
+            out.push(cur);
+            cur = nxt;
+        }
+    }
+
+    out.push(cur);
+    out
+}
+

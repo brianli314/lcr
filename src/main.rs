@@ -15,17 +15,17 @@ use threadpool::ThreadPool;
 use crate::{
     fasta_parsing::{FastaIterator, BUFF_SIZE},
     slowdust::{longdust_score, merge_intervals, slowdust, LCR},
-    fasterdust::fasterdust
+    fasterdust::{fasterdust, union_good_intervals}
 };
 
 fn main() -> Result<()> {
-    let num_threads = 1;
+    let num_threads = 2;
     let pool = ThreadPool::new(num_threads);
 
-    let file = File::open("test copy.fasta")?;
+    let file = File::open("test.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
-    let output = File::create("result.tsv")?;
+    let output = File::create("result_test.tsv")?;
     let writer = Arc::new(Mutex::new(BufWriter::with_capacity(BUFF_SIZE, output)));
 
     {
@@ -76,11 +76,12 @@ fn main() -> Result<()> {
 
             println!("{}", longdust_score(seq, 0.6));
              */
-            fasterdust(&fasta, 5000, 0.6, &mut output);
+            fasterdust(&fasta, 7, 5000, 0.6, &mut output);
+            let merged = union_good_intervals(output, true);
             let loop_elapsed = loop_now.elapsed();
             println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
             let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
-            for lcr in output {
+            for lcr in merged {
                 let _ = writeln!(guard, "{}", lcr);
             }
             guard.flush().expect("Failed to flush writer");

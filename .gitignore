@@ -3,3 +3,5 @@
 *.tsv
 *.exe
 *.txt
+*.fa.gz
+*.fa
