@@ -8,12 +8,11 @@ pub struct LCR {
     pub name: String,
     pub start: usize, // inclusive
     pub end: usize,   // inclusive
-    pub seq: String,
 }
 
 impl LCR {
-    pub fn new(name: String, start: usize, end: usize, seq: String) -> Self {
-        Self { name, start, end, seq }
+    pub fn new(name: String, start: usize, end: usize) -> Self {
+        Self { name, start, end }
     }
     pub fn get_name(&self) -> &str { &self.name }
     pub fn get_start(&self) -> usize { self.start }
@@ -22,7 +21,7 @@ impl LCR {
 
 impl fmt::Display for LCR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\t{}\t{}\t{}", self.name, self.start, self.end, self.seq)
+        write!(f, "{}\t{}\t{}", self.name, self.start, self.end)
     }
 }
 
@@ -142,15 +141,10 @@ pub fn fasterdust(
             if s_total >= t
                 && is_good_window(&kmers, s, end, k, t, &ln_table, s_total) {
                     // Push [start, end] inclusive, with exact sequence slice
-                    let subseq = unsafe {
-                        std::str::from_utf8_unchecked(&seq[s..=end])
-                    }.to_owned();
-
                     output.push(LCR {
                         name: name.clone(),
                         start: s,
                         end,
-                        seq: subseq,
                     });
                 }
 
@@ -274,8 +268,6 @@ pub fn union_good_intervals(mut ivals: Vec<LCR>, merge_touching: bool) -> Vec<LC
 
                 if ext_len > 0 {
                     // Take the last `ext_len` chars from nxt.seq
-                    let tail = &nxt.seq[nxt.seq.len() - ext_len..];
-                    cur.seq.push_str(tail);
                     cur.end = nxt.end;
                 }
                 // If nxt.end <= cur.end, cur already fully covers nxt; nothing to do.
