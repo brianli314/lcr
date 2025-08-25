@@ -17,6 +17,9 @@ impl LCR {
     pub fn get_name(&self) -> &str { &self.name }
     pub fn get_start(&self) -> usize { self.start }
     pub fn get_end(&self) -> usize { self.end }
+    pub fn add_one(self) -> Self {
+        LCR { name: self.name, start: self.start, end: self.end + 1 }
+    }
 }
 
 impl fmt::Display for LCR {
@@ -144,7 +147,7 @@ pub fn fasterdust(
                     output.push(LCR {
                         name: name.clone(),
                         start: s,
-                        end,
+                        end: end + 1,
                     });
                 }
 
