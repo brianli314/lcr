@@ -14,12 +14,13 @@ use threadpool::ThreadPool;
 
 use crate::{
     fasta_parsing::{FastaIterator, BUFF_SIZE},
-    slowdust::{longdust_score, merge_intervals, slowdust, LCR},
+    //slowdust::{longdust_score, merge_intervals, slowdust, LCR},
     fasterdust::{fasterdust, union_good_intervals}
 };
 
 fn main() -> Result<()> {
     let num_threads = 2;
+    const MAX_IN_FLIGHT: usize = 4 * 2; // 4× threads; tune to your I/O/CPU
     let pool = ThreadPool::new(num_threads);
 
     let file = File::open("test.fasta")?;
@@ -41,6 +42,10 @@ fn main() -> Result<()> {
     for line in iterator {
         let fasta = line?;
         let writer_clone = Arc::clone(&writer);
+        
+        while pool.queued_count() >= MAX_IN_FLIGHT {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
         
         pool.execute(move || {
             let loop_now = Instant::now();
