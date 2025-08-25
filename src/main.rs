@@ -20,7 +20,8 @@ use crate::{
 
 fn main() -> Result<()> {
     let num_threads = 2;
-    const MAX_IN_FLIGHT: usize = 4 * 2; // 4× threads; tune to your I/O/CPU
+    const MAX_IN_FLIGHT: usize = 4 * 2;
+    
     let pool = ThreadPool::new(num_threads);
 
     let file = File::open("test.fasta")?;
