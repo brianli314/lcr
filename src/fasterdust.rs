@@ -24,7 +24,7 @@ impl LCR {
 
 impl fmt::Display for LCR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\t{}\t{}", self.name, self.start, self.end)
+        write!(f, "{}\t{}\t{}", self.name, self.start, self.end + 1)
     }
 }
 
@@ -147,7 +147,7 @@ pub fn fasterdust(
                     output.push(LCR {
                         name: name.clone(),
                         start: s,
-                        end: end + 1,
+                        end,
                     });
                 }
 

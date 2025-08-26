@@ -15,24 +15,24 @@ use threadpool::ThreadPool;
 use crate::{
     fasta_parsing::{FastaIterator, BUFF_SIZE},
     //slowdust::{longdust_score, merge_intervals, slowdust, LCR},
-    fasterdust::{fasterdust, union_good_intervals}
+    fasterdust::{fasterdust, union_good_intervals}, slowdust::longdust_score
 };
 
 fn main() -> Result<()> {
     let num_threads = 2;
     const MAX_IN_FLIGHT: usize = 4 * 2;
-    
+
     let pool = ThreadPool::new(num_threads);
 
-    let file = File::open("test.fasta")?;
+    let file = File::open("data/scoring_test.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
-    let output = File::create("result_test.tsv")?;
+    let output = File::create("data/result.tsv")?;
     let writer = Arc::new(Mutex::new(BufWriter::with_capacity(BUFF_SIZE, output)));
 
     {
         let mut header_guard = writer.lock().unwrap();
-        let _ = writeln!(header_guard, "Name\tStart\tEnd\tString\n");
+        let _ = writeln!(header_guard, "Name\tStart\tEnd\n");
         println!("Header written");
         header_guard.flush()?;
     }
@@ -79,9 +79,9 @@ fn main() -> Result<()> {
                 .split_whitespace()
                 .next()
                 .unwrap_or_default();
-
-            println!("{}", longdust_score(seq, 0.6));
              */
+            println!("{}", longdust_score(fasta.get_sequence(), 0.6));
+
             fasterdust(&fasta, 7, 5000, 0.6, &mut output);
             let merged = union_good_intervals(output, true);
             let loop_elapsed = loop_now.elapsed();
