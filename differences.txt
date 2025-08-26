@@ -5,9 +5,10 @@ Coordinates (412273, 412302): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
 Coordinates (511502, 511521): normal_m1bp.tsv has 1, longdust_1mbp.tsv has 0
 Coordinates (511501, 511530): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
 
+Endpoint issue?
 Coordinates (568128, 568158): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
 Coordinates (568128, 568174): normal_m1bp.tsv has 1, longdust_1mbp.tsv has 0
-Coordinates (568159, 568174): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
+Coordinates (568159, 568174): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1 
 
 --- Run 2 ---
 Coordinates (886503, 886530): longdust_1mbp.tsv has 1, slow_1mbp.tsv has 0
