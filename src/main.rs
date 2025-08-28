@@ -2,6 +2,7 @@ pub mod fasta_parsing;
 pub mod output;
 pub mod slowdust;
 pub mod fasterdust;
+pub mod testdust;
 
 use anyhow::{Ok, Result};
 use std::{
@@ -27,7 +28,7 @@ fn main() -> Result<()> {
     let file = File::open("data/scoring_test.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
-    let output = File::create("data/result.tsv")?;
+    let output = File::create("test.tsv")?;
     let writer = Arc::new(Mutex::new(BufWriter::with_capacity(BUFF_SIZE, output)));
 
     {
