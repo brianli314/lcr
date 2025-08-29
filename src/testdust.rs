@@ -1,54 +1,101 @@
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::fasta_parsing::Fasta;
+use crate::slowdust::LCR;
 
-#[derive(Clone)]
-pub struct LCR {
-    pub name: String,
-    pub start: usize, // inclusive
-    pub end: usize,   // inclusive
-}
-
-impl LCR {
-    pub fn new(name: String, start: usize, end: usize) -> Self {
-        Self { name, start, end }
-    }
-    pub fn get_name(&self) -> &str { &self.name }
-    pub fn get_start(&self) -> usize { self.start }
-    pub fn get_end(&self) -> usize { self.end }
-    pub fn add_one(self) -> Self {
-        LCR { name: self.name, start: self.start, end: self.end + 1 }
-    }
-}
-
-impl fmt::Display for LCR {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\t{}\t{}", self.name, self.start, self.end + 1)
-    }
-}
-
-pub fn testdust(input: &Fasta, k: usize, max_window: usize, t: f64, output: &mut Vec<LCR>){
+pub fn testdust(input: &Fasta, k: usize, max_window: usize, t: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
-    let name = input
-        .get_name()
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_owned();
 
+    for end in k..=seq.len() {
 
-    for end in k..seq.len(){
-        let window_score = 0.0;
+        let mut prev_score = 0.0;
 
-        for win in k..=max_window{
-            if k > end {continue}
+        let mut kmer_counts: HashMap<&str, f64> = HashMap::new();
+
+        for win in k..=max_window {
+            if win > end {
+                break;
+            }
             
-            let start = end - k;
-            let window = &seq[start..=end];
+            let start = end - win;
+            let window = &seq[start..end];
+            
+            
+            let new_mer = &window[..k];
+            let entry = kmer_counts.entry(new_mer).or_insert(0.0);
+            *entry += 1.0;
 
+            let c_new = *entry;
+            let window_score = prev_score + (c_new).ln() - t;
+
+            prev_score = window_score;
+            if window_score < t {
+                continue;
+            }
             
 
+            if is_good_seq(window, window_score, k, t) {
+                output.push(LCR {
+                    name: input
+                        .get_name()
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or_default()
+                        .to_owned(),
+                    start,
+                    end,
+                })
+            }  
         }
     }
+}
 
+pub fn is_good_seq(window: &str, window_score: f64, k: usize, t: f64) -> bool {
+    let mut prev_score_p = 0.0;
+    let mut prev_score_s = 0.0;
+
+    let mut kmer_counts_p: HashMap<&str, f64> = HashMap::new();
+    let mut kmer_counts_s: HashMap<&str, f64> = HashMap::new();
+
+    for i in 0..=window.len() {
+        let prefix = &window[..i];
+
+        if prefix.len() >= k{
+
+            let new_mer_p = &prefix[prefix.len() - k..];
+
+            let entry_p = kmer_counts_p.entry(new_mer_p).or_insert(0.0);
+            *entry_p += 1.0;
+            let c_new_p = *entry_p;
+            let prefix_score = prev_score_p + (c_new_p).ln() - t;
+            prev_score_p = prefix_score;
+
+            if round_e12(prefix_score) > round_e12(window_score) {
+                return false;
+            }
+        }
+        let suffix = &window[window.len()-i..];
+
+        if suffix.len() >= k{
+            
+            let new_mer_s = &suffix[..k];
+
+            let entry_s = kmer_counts_s.entry(new_mer_s).or_insert(0.0);
+            *entry_s += 1.0;
+            let c_new_s = *entry_s;
+            let suffix_score = prev_score_s + (c_new_s).ln() - t;
+            prev_score_s = suffix_score;
+
+            if round_e12(suffix_score) > round_e12(window_score) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+
+fn round_e12(n:f64) -> f64{
+    (n * 1e12).round() / 1e12
 }

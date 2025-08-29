@@ -6,24 +6,22 @@ pub mod testdust;
 
 use anyhow::{Ok, Result};
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter, Write},
-    sync::{Arc, Mutex},
-    time::Instant,
+    collections::HashMap, fs::File, io::{BufReader, BufWriter, Write}, sync::{Arc, Mutex}, time::Instant
 };
 use threadpool::ThreadPool;
 
 use crate::{
     fasta_parsing::{FastaIterator, BUFF_SIZE},
     //slowdust::{longdust_score, merge_intervals, slowdust, LCR},
-    fasterdust::{fasterdust, union_good_intervals}, slowdust::longdust_score
+    fasterdust::fasterdust, 
+    slowdust::{longdust_score, merge_intervals, slowdust},
+    testdust::{is_good_seq, testdust}
 };
 
 fn main() -> Result<()> {
-    let num_threads = 2;
-    const MAX_IN_FLIGHT: usize = 4 * 2;
+    const NUM_THREADS: usize = 2;
 
-    let pool = ThreadPool::new(num_threads);
+    let pool = ThreadPool::new(NUM_THREADS);
 
     let file = File::open("data/scoring_test.fasta")?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
@@ -43,13 +41,11 @@ fn main() -> Result<()> {
     println!("Starting loop");
     for line in iterator {
         let fasta = line?;
+        //let seq = fasta.get_sequence();
         let writer_clone = Arc::clone(&writer);
         
-        while pool.queued_count() >= MAX_IN_FLIGHT {
-            std::thread::sleep(std::time::Duration::from_millis(2));
-        }
-        
         pool.execute(move || {
+            let seq = fasta.get_sequence();
             let loop_now = Instant::now();
             let mut output = Vec::new();
             let name = fasta
@@ -57,34 +53,32 @@ fn main() -> Result<()> {
                 .split_whitespace()
                 .next()
                 .unwrap_or_default();
-            /*
-            let fasta_clone = fasta.clone();
-            let seq = fasta_clone.get_sequence();
+
             
-            slowdust(&fasta, 5000, 0.6, &mut temp);
-            temp.sort_by(|lcr1, lcr2| {
-                lcr1.get_start()
-                    .cmp(&lcr2.get_start())
-                    .then(lcr1.get_end().cmp(&lcr2.get_end()))
-            });
+             
+            let score = longdust_score(seq, 7, 0.6);
+            println!("{}", longdust_score(seq, 7, 0.6));
+            println!("{}", is_good_seq(seq, score, 7, 0.6));
 
-            let merged = merge_intervals(temp, seq);
+            let mut kmer_counts = HashMap::new();
+            let mut prev_score = 0.0;
+            println!("{}", seq.len());
+            for i in 0..seq.len(){
+                let win = &seq[i..];
+                if win.len() >= 7{
+                    let new_mer = &win[..7];
 
-            let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
-            for lcr in merged {
-                let _ = writeln!(guard, "{}", lcr);
+                    let entry = kmer_counts.entry(new_mer).or_insert(0.0);
+                    *entry += 1.0;
+                    let c_new: f64 = *entry;
+                    prev_score = prev_score + (c_new).ln() - 0.6;
+                }
             }
-            guard.flush().expect("Failed to flush writer");
-            let name = fasta
-                .get_name()
-                .split_whitespace()
-                .next()
-                .unwrap_or_default();
-             */
-            println!("{}", longdust_score(fasta.get_sequence(), 0.6));
+            println!("{}", prev_score);
+            
 
-            fasterdust(&fasta, 7, 5000, 0.6, &mut output);
-            let merged = union_good_intervals(output, true);
+            testdust(&fasta, 7, 5000, 0.6, &mut output);
+            let merged = merge_intervals(output);
             let loop_elapsed = loop_now.elapsed();
             println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
             let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());

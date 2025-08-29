@@ -1,32 +1,6 @@
-use core::fmt;
 use rustc_hash::FxHashMap;
-
 use crate::fasta_parsing::Fasta;
-
-#[derive(Clone)]
-pub struct LCR {
-    pub name: String,
-    pub start: usize, // inclusive
-    pub end: usize,   // inclusive
-}
-
-impl LCR {
-    pub fn new(name: String, start: usize, end: usize) -> Self {
-        Self { name, start, end }
-    }
-    pub fn get_name(&self) -> &str { &self.name }
-    pub fn get_start(&self) -> usize { self.start }
-    pub fn get_end(&self) -> usize { self.end }
-    pub fn add_one(self) -> Self {
-        LCR { name: self.name, start: self.start, end: self.end + 1 }
-    }
-}
-
-impl fmt::Display for LCR {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\t{}\t{}", self.name, self.start, self.end + 1)
-    }
-}
+use crate::slowdust::LCR;
 
 /// Encode A/C/G/T → 2-bit; anything else -> None
 #[inline]
@@ -220,72 +194,5 @@ fn is_good_window(
     }
 
     true
-}
-
-/// Union (merge) overlapping/touching LCRs, per contig name.
-/// - Coordinates are treated as inclusive [start, end].
-/// - If `merge_touching` is true, [a..b] and [b+1..c] are merged.
-/// - Merged `seq` is built by appending only the non-overlapping tail from the
-///   next interval’s `seq`, so you don't need the full reference string.
-pub fn union_good_intervals(mut ivals: Vec<LCR>, merge_touching: bool) -> Vec<LCR> {
-    if ivals.is_empty() {
-        return ivals;
-    }
-
-    // Sort by (name, start, end)
-    ivals.sort_by(|a, b| {
-        match a.name.cmp(&b.name) {
-            std::cmp::Ordering::Equal => match a.start.cmp(&b.start) {
-                std::cmp::Ordering::Equal => a.end.cmp(&b.end),
-                o => o,
-            },
-            o => o,
-        }
-    });
-
-    let mut out = Vec::<LCR>::with_capacity(ivals.len());
-    let mut cur = ivals[0].clone();
-
-    for nxt in ivals.into_iter().skip(1) {
-        if nxt.name != cur.name {
-            // Different contig: flush current and start a new chain
-            out.push(cur);
-            cur = nxt;
-            continue;
-        }
-
-        // Decide if they should be merged
-        let joinable = if merge_touching {
-            nxt.start <= cur.end + 1
-        } else {
-            nxt.start <= cur.end
-        };
-
-        if joinable {
-            if nxt.end > cur.end {
-                // Append only the non-overlapping tail of nxt.seq to cur.seq
-                // Overlap length in bases (≥0 if there is overlap, 0 if just touching)
-                let overlap_len = cur.end.saturating_sub(nxt.start).saturating_add(1);
-                // How many new bases are added beyond `cur.end`
-                let ext_len = nxt.end - cur.end;
-
-                if ext_len > 0 {
-                    // Take the last `ext_len` chars from nxt.seq
-                    cur.end = nxt.end;
-                }
-                // If nxt.end <= cur.end, cur already fully covers nxt; nothing to do.
-                // (Contained intervals are naturally absorbed.)
-                let _ = overlap_len; // kept for clarity
-            }
-            // If not extending, we effectively absorb nxt (it’s contained).
-        } else {
-            // Disjoint: flush current and start new chain
-            out.push(cur);
-            cur = nxt;
-        }
-    }
-
-    out.push(cur);
-    out
 }
 
