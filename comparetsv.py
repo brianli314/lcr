@@ -14,7 +14,6 @@ def compare_tsv(file1, file2):
     records1 = read_tsv(file1)
     records2 = read_tsv(file2)
 
-    # Group by name
     groups1 = defaultdict(list)
     groups2 = defaultdict(list)
     for name, start, end in records1:
@@ -38,12 +37,11 @@ def compare_tsv(file1, file2):
             differences = True
             continue
 
-        # Count frequencies of (start, end) pairs
         c1 = Counter(coords1)
         c2 = Counter(coords2)
 
         if c1 == c2:
-            continue  # perfectly matches
+            continue
 
         differences = True
         print(f"Differences for {name}:")
@@ -54,10 +52,9 @@ def compare_tsv(file1, file2):
                 print(f"  Coordinates {pair}: {file1} has {n1}, {file2} has {n2}")
 
     if not differences:
-        print("The two TSV files match exactly (ignoring ordering).")
+        print("The two TSV files match exactly.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print(f"Usage: python compare_tsv.py file1.tsv file2.tsv")
         sys.exit(1)
     compare_tsv(sys.argv[1], sys.argv[2])

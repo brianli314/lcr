@@ -95,6 +95,6 @@ pub fn is_good_seq(window: &str, window_score: f64, k: usize, t: f64) -> bool {
 }
 
 
-fn round_e12(n:f64) -> f64{
-    (n * 1e12).round() / 1e12
+pub fn round_e12(n:f64) -> f64{
+    (n * 1e10).round() / 1e1
 }

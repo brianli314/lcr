@@ -1,45 +1,52 @@
 pub mod fasta_parsing;
 pub mod slowdust;
 pub mod slowdust2;
+pub mod command_line;
 
 use anyhow::{Ok, Result};
+use clap::Parser;
 use std::{
-    fs::File, io::{BufReader, BufWriter, Write}, sync::{Arc, Mutex}, time::Instant
+    collections::HashMap,
+    fs::File,
+    io::{BufReader, BufWriter, Write},
+    sync::{Arc, Mutex},
+    time::Instant,
 };
 use threadpool::ThreadPool;
 
 use crate::{
-    fasta_parsing::{FastaIterator, BUFF_SIZE},
-    slowdust::merge_intervals,
-    slowdust2::slowdust2
+    command_line::DustArgs, fasta_parsing::{FastaIterator, BUFF_SIZE}, slowdust::{longdust_score, merge_intervals, slowdust}, slowdust2::{is_good_seq, slowdust2}
 };
 
 fn main() -> Result<()> {
-    const NUM_THREADS: usize = 2;
+    
+    //print_score("ctcctctcctttcttctctccatccCCCCTCCATCCCcgtctcctttctcctctccatccccctctccatccccctctccatctccctctcctttctcctctccatccccctctcctttctccctctccatccccctctCCTTTCTTC",7, 0.6);
+    //return Ok(());
 
-    let pool = ThreadPool::new(NUM_THREADS);
+    let args = DustArgs::parse();
+    
+    let num_threads: usize = args.threads;
 
-    let file = File::open("data/scoring_test.fasta")?;
+    let pool = ThreadPool::new(num_threads);
+
+    let file = File::open(args.input_file)?;
     let reader = BufReader::with_capacity(BUFF_SIZE, file);
 
-    let output = File::create("test.tsv")?;
+    let output = File::create(args.output_file)?;
     let writer = Arc::new(Mutex::new(BufWriter::with_capacity(BUFF_SIZE, output)));
 
     {
         let mut header_guard = writer.lock().unwrap();
         let _ = writeln!(header_guard, "Name\tStart\tEnd\n");
-        println!("Header written");
         header_guard.flush()?;
     }
 
     let iterator = FastaIterator::new(reader);
 
-    println!("Starting loop");
     for line in iterator {
         let fasta = line?;
-        //let seq = fasta.get_sequence();
         let writer_clone = Arc::clone(&writer);
-        
+
         pool.execute(move || {
             //let seq = fasta.get_sequence();
             let loop_now = Instant::now();
@@ -59,33 +66,72 @@ fn main() -> Result<()> {
                 let _ = writeln!(guard, "{}", lcr);
             }
             guard.flush().expect("Failed to flush writer");
-
         });
     }
     pool.join();
     println!("Finished running");
 
     Ok(())
+}
 
-    /*
-            let score = longdust_score(seq, 7, 0.6);
-            println!("{}", longdust_score(seq, 7, 0.6));
-            println!("{}", is_good_seq(seq, score, 7, 0.6));
 
-            let mut kmer_counts = HashMap::new();
-            let mut prev_score = 0.0;
-            println!("{}", seq.len());
-            for i in 0..seq.len(){
-                let win = &seq[i..];
-                if win.len() >= 7{
-                    let new_mer = &win[..7];
+//For manual sequence checking
+fn print_score(seq: &str, k: usize, t: f64) {
+    let score = longdust_score(seq, k, t);
 
-                    let entry = kmer_counts.entry(new_mer).or_insert(0.0);
-                    *entry += 1.0;
-                    let c_new: f64 = *entry;
-                    prev_score = prev_score + (c_new).ln() - 0.6;
-                }
-            }
-            println!("{}", prev_score);
-             */
+    let mut kmer_counts = HashMap::new();
+    let mut score_2 = 0.0;
+    for i in k..=seq.len() {
+        let window = &seq[..i];
+
+        let new_mer = &window[window.len() - k..];
+        let entry = kmer_counts.entry(new_mer).or_insert(0.0);
+        *entry += 1.0;
+
+        let c_new: f64 = *entry;
+        let window_score = score_2 + (c_new).ln() - t;
+
+        score_2 = window_score;
+    }
+
+    if score < t{
+        println!("slowdust-below threshold: {score}")
+    } else {
+        println!("slowdust: {score}")
+    }
+
+    if score_2 < t {
+        println!("slowdust2-below threshold: {score_2}")
+    } else {
+        println!("slowdust2: {score_2}")
+    }
+
+    let mut is_good = true;
+    for j in 0..=seq.len() {
+        let prefix = &seq[..j];
+        let suffix = &seq[j..];
+        if longdust_score(prefix, k, t) > score || longdust_score(suffix, k, t) > score {
+            is_good = false;
+            break;
+        }
+    }
+
+    if is_good{
+        println!("slowdust: Good")
+    } else {
+        println!("slowdust: Not good")
+    }
+
+    if is_good_seq(seq, score_2, k, t) {
+        println!("slowdust2: Good")
+    } else {
+        println!("slowdust2: Not good")
+    }
+
+
+    if is_good_seq(seq, score, k, t) {
+        println!("slowdust2 with slowdust score: Good seq")
+    } else {
+        println!("slowdust2 with slowdust score: Not good seq")
+    }
 }
