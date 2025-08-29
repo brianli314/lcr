@@ -11,4 +11,5 @@ with open(file_path, 'r') as f:
         else:
             string = string + line.strip("\n")
 
+    print(f"{len(string)} bp")
     print(string[start:end])
