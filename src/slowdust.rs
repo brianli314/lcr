@@ -1,7 +1,6 @@
 use core::fmt;
 use rustc_hash::FxHashMap;
 use statrs::function::factorial::ln_factorial;
-use std::{cmp::max, time::Instant};
 
 use crate::fasta_parsing::Fasta;
 

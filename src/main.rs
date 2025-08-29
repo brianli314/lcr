@@ -1,21 +1,17 @@
 pub mod fasta_parsing;
-pub mod output;
 pub mod slowdust;
-pub mod fasterdust;
-pub mod testdust;
+pub mod slowdust2;
 
 use anyhow::{Ok, Result};
 use std::{
-    collections::HashMap, fs::File, io::{BufReader, BufWriter, Write}, sync::{Arc, Mutex}, time::Instant
+    fs::File, io::{BufReader, BufWriter, Write}, sync::{Arc, Mutex}, time::Instant
 };
 use threadpool::ThreadPool;
 
 use crate::{
     fasta_parsing::{FastaIterator, BUFF_SIZE},
-    //slowdust::{longdust_score, merge_intervals, slowdust, LCR},
-    fasterdust::fasterdust, 
-    slowdust::{longdust_score, merge_intervals, slowdust},
-    testdust::{is_good_seq, testdust}
+    slowdust::merge_intervals,
+    slowdust2::slowdust2
 };
 
 fn main() -> Result<()> {
@@ -45,7 +41,7 @@ fn main() -> Result<()> {
         let writer_clone = Arc::clone(&writer);
         
         pool.execute(move || {
-            let seq = fasta.get_sequence();
+            //let seq = fasta.get_sequence();
             let loop_now = Instant::now();
             let mut output = Vec::new();
             let name = fasta
@@ -54,8 +50,24 @@ fn main() -> Result<()> {
                 .next()
                 .unwrap_or_default();
 
-            
-             
+            slowdust2(&fasta, 7, 5000, 0.6, &mut output);
+            let merged = merge_intervals(output);
+            let loop_elapsed = loop_now.elapsed();
+            println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
+            let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
+            for lcr in merged {
+                let _ = writeln!(guard, "{}", lcr);
+            }
+            guard.flush().expect("Failed to flush writer");
+
+        });
+    }
+    pool.join();
+    println!("Finished running");
+
+    Ok(())
+
+    /*
             let score = longdust_score(seq, 7, 0.6);
             println!("{}", longdust_score(seq, 7, 0.6));
             println!("{}", is_good_seq(seq, score, 7, 0.6));
@@ -75,22 +87,5 @@ fn main() -> Result<()> {
                 }
             }
             println!("{}", prev_score);
-            
-
-            testdust(&fasta, 7, 5000, 0.6, &mut output);
-            let merged = merge_intervals(output);
-            let loop_elapsed = loop_now.elapsed();
-            println!("1 Loop finished in {loop_elapsed:.2?} for {name}");
-            let mut guard = writer_clone.lock().unwrap_or_else(|e| e.into_inner());
-            for lcr in merged {
-                let _ = writeln!(guard, "{}", lcr);
-            }
-            guard.flush().expect("Failed to flush writer");
-
-        });
-    }
-    pool.join();
-    println!("Finished running");
-
-    Ok(())
+             */
 }

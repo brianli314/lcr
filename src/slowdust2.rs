@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::fmt;
 
 use crate::fasta_parsing::Fasta;
 use crate::slowdust::LCR;
 
-pub fn testdust(input: &Fasta, k: usize, max_window: usize, t: f64, output: &mut Vec<LCR>) {
+pub fn slowdust2(input: &Fasta, k: usize, max_window: usize, t: f64, output: &mut Vec<LCR>) {
     let seq = input.get_sequence();
 
     for end in k..=seq.len() {
