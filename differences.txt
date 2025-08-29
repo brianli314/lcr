@@ -1,18 +1,47 @@
---- Run 1: Endpoint error? ---
-Coordinates (886503, 886530): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
-Coordinates (412273, 412302): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
-
-Coordinates (511502, 511521): normal_m1bp.tsv has 1, longdust_1mbp.tsv has 0
-Coordinates (511501, 511530): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
-
-Endpoint issue?
-Coordinates (568128, 568158): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1
-Coordinates (568159, 568174): normal_m1bp.tsv has 0, longdust_1mbp.tsv has 1 
-Coordinates (568128, 568174): normal_m1bp.tsv has 1, longdust_1mbp.tsv has 0
-
---- Run 2 ---
+---Random 1mbp---
 Coordinates (886503, 886530): longdust_1mbp.tsv has 1, slow_1mbp.tsv has 0
 Coordinates (412273, 412302): longdust_1mbp.tsv has 1, slow_1mbp.tsv has 0
 
 Coordinates (511501, 511530): longdust_1mbp.tsv has 1, slow_1mbp.tsv has 0
 Coordinates (511502, 511521): longdust_1mbp.tsv has 0, slow_1mbp.tsv has 1
+
+---Chromosome 1 1mbp start---
+Coordinates (22496, 26286): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (22496, 23538): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0 
+Coordinates (24010, 24027): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (24123, 26286): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (338542, 339534): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (338542, 338884): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (338950, 339534): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (458608, 461467): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (458622, 459294): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (459773, 461467): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (505680, 509643): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (505949, 507750): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (508961, 509642): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (673192, 678707): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (673225, 674229): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (677008, 678707): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (828675, 828696): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (828676, 828686): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+
+Coordinates (858933, 862658): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (858933, 861451): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (861841, 862577): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+---Larger X-drop---
+Coordinates (673192, 678707): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+Coordinates (673225, 674229): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (677008, 678707): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+
+Coordinates (828675, 828696): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (828676, 828686): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
+
+---Even larger---
+Coordinates (828675, 828696): longdust_start_1mbp.tsv has 1, slow_start_1mb.tsv has 0
+Coordinates (828676, 828686): longdust_start_1mbp.tsv has 0, slow_start_1mb.tsv has 1
